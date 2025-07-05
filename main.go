@@ -21,7 +21,7 @@ func main() {
 		return
 	}
 
-	err = db.AutoMigrate(&database.Product{}, &database.Category{})
+	err = db.AutoMigrate(&database.Product{}, &database.Category{}, &database.ProductImages{})
 
 	if err != nil {
 		log.Fatalf("Migration failed: %v", err)

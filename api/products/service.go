@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 	"github.com/smartbot/catalog/database"
 	"github.com/smartbot/catalog/pkg/dbclient"
 	"github.com/smartbot/catalog/pkg/errors"
@@ -14,10 +15,11 @@ import (
 type ProductsService struct {
 }
 
-func (us *ProductsService) AddProduct(req CreateProductRequest) (*ProductResponse, *errors.ApiError) {
+func (ps *ProductsService) AddProduct(req CreateProductRequest) (*ProductResponse, *errors.ApiError) {
 	db := dbclient.GetCient()
 
 	item := database.Product{
+		ID:          uuid.New(),
 		Name:        req.Name,
 		Description: req.Description,
 		Price:       req.Price,
@@ -40,19 +42,20 @@ func (us *ProductsService) AddProduct(req CreateProductRequest) (*ProductRespons
 		Description: item.Description,
 		Stock:       item.Stock,
 		Price:       item.Price,
+		CategoryID:  item.CategoryID,
 		CreatedAt:   item.CreatedAt.String(),
 		UpdatedAt:   item.UpdatedAt.String(),
 	}, nil
 
 }
 
-func (us *ProductsService) GetProducts(request GetProductsRequest) (*ProductsResponse, *errors.ApiError) {
+func (ps *ProductsService) GetProducts(request GetProductsRequest) (*ProductsResponse, *errors.ApiError) {
 	db := dbclient.GetCient()
 	var items []database.Product
 	var total int64
 
 	db.Model(&database.Product{}).Count(&total)
-	result := db.Order("created_at").Offset(request.PageSize * (request.PageNo - 1)).Limit(request.PageSize).Find(&items)
+	result := db.Preload("Category").Order("created_at").Offset(request.PageSize * (request.PageNo - 1)).Limit(request.PageSize).Find(&items)
 
 	if result.Error != nil {
 		return nil, errors.InternalServerError("Failed to get products")
@@ -65,6 +68,8 @@ func (us *ProductsService) GetProducts(request GetProductsRequest) (*ProductsRes
 			Description: item.Description,
 			Stock:       item.Stock,
 			Price:       item.Price,
+			CategoryID:  item.CategoryID,
+			Category:    item.Category.Name,
 			CreatedAt:   item.CreatedAt.String(),
 			UpdatedAt:   item.UpdatedAt.String(),
 		}
@@ -77,7 +82,7 @@ func (us *ProductsService) GetProducts(request GetProductsRequest) (*ProductsRes
 
 }
 
-func (us *ProductsService) GetProduct(id string) (*ProductResponse, *errors.ApiError) {
+func (ps *ProductsService) GetProduct(id string) (*ProductResponse, *errors.ApiError) {
 	db := dbclient.GetCient()
 	var item database.Product
 	result := db.Where("id = ?", id).First(&item)
@@ -97,12 +102,13 @@ func (us *ProductsService) GetProduct(id string) (*ProductResponse, *errors.ApiE
 		Description: item.Description,
 		Stock:       item.Stock,
 		Price:       item.Price,
+		CategoryID:  item.CategoryID,
 		CreatedAt:   item.CreatedAt.String(),
 		UpdatedAt:   item.UpdatedAt.String(),
 	}, nil
 }
 
-func (us *ProductsService) UpdateProduct(id string, request CreateProductRequest) (*ProductResponse, *errors.ApiError) {
+func (ps *ProductsService) UpdateProduct(id string, request CreateProductRequest) (*ProductResponse, *errors.ApiError) {
 	db := dbclient.GetCient()
 
 	var item database.Product
@@ -130,13 +136,14 @@ func (us *ProductsService) UpdateProduct(id string, request CreateProductRequest
 		Description: item.Description,
 		Stock:       item.Stock,
 		Price:       item.Price,
+		CategoryID:  item.CategoryID,
 		CreatedAt:   item.CreatedAt.String(),
 		UpdatedAt:   item.UpdatedAt.String(),
 	}, nil
 
 }
 
-func (us *ProductsService) DeleteProduct(productId string) *errors.ApiError {
+func (ps *ProductsService) DeleteProduct(productId string) *errors.ApiError {
 	db := dbclient.GetCient()
 	result := db.Where("id = ?", productId).Delete(&database.Product{})
 	if result.Error != nil {
@@ -147,4 +154,76 @@ func (us *ProductsService) DeleteProduct(productId string) *errors.ApiError {
 	}
 
 	return nil
+}
+
+func (ps *ProductsService) PostImages(productId string, req PostImagesRequest) (*PostImagesResponse, *errors.ApiError) {
+	db := dbclient.GetCient()
+
+	tx := db.Begin()
+
+	deleteResult := db.Where("product_id = ?", productId).Delete(&database.ProductImages{})
+
+	if deleteResult.Error != nil {
+		tx.Rollback()
+		return nil, errors.InternalServerError("Failed to save images")
+	}
+
+	var newImages []database.ProductImages
+
+	for _, img := range req.Images {
+		newImages = append(newImages, database.ProductImages{
+			ProductID:    productId,
+			ImageURL:     img.ImageUrl,
+			IsPrimary:    img.IsPrimary,
+			DisplayOrder: img.DisplayOrder,
+		})
+	}
+
+	result := tx.Create(&newImages)
+	if result.Error != nil {
+		tx.Rollback()
+		return nil, errors.InternalServerError("Failed to save images")
+	}
+
+	tx.Commit()
+
+	finalImages := utils.Map(newImages, func(img database.ProductImages) ImageResponse {
+		return ImageResponse{
+			ID:           img.ID.String(),
+			DisplayOrder: img.DisplayOrder,
+			IsPrimary:    img.IsPrimary,
+			ImageUrl:     img.ImageURL,
+		}
+	})
+
+	return &PostImagesResponse{
+		Images: finalImages,
+	}, nil
+
+}
+
+func (ps *ProductsService) GetImages(productId string) (*PostImagesResponse, *errors.ApiError) {
+	db := dbclient.GetCient()
+	var images []database.ProductImages
+
+	result := db.Where("product_id = ?", productId).Find(&images)
+
+	if result.Error != nil {
+
+		return nil, errors.InternalServerError("Failed to fetch images")
+	}
+
+	finalImages := utils.Map(images, func(img database.ProductImages) ImageResponse {
+		return ImageResponse{
+			ID:           img.ID.String(),
+			DisplayOrder: img.DisplayOrder,
+			IsPrimary:    img.IsPrimary,
+			ImageUrl:     img.ImageURL,
+		}
+	})
+
+	return &PostImagesResponse{
+		Images: finalImages,
+	}, nil
+
 }
