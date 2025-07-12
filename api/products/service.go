@@ -85,9 +85,11 @@ func (ps *ProductsService) GetProducts(request GetProductsRequest) (*ProductsRes
 func (ps *ProductsService) GetProduct(id string) (*ProductResponse, *errors.ApiError) {
 	db := dbclient.GetCient()
 	var item database.Product
+	var images []database.ProductImages
 	result := db.Where("id = ?", id).First(&item)
+	result2 := db.Model(database.ProductImages{}).Where("product_id = ?", id).Find(&images)
 
-	if result.Error != nil {
+	if result.Error != nil || result2.Error != nil {
 		log.Println("GetProduct: %+v", result.Error)
 		if result.Error == gorm.ErrRecordNotFound {
 			return nil, errors.NotFoundError("Product not found")
@@ -96,12 +98,22 @@ func (ps *ProductsService) GetProduct(id string) (*ProductResponse, *errors.ApiE
 		return nil, errors.InternalServerError("Failed to get product")
 	}
 
+	finalImages := utils.Map(images, func(img database.ProductImages) ImageResponse {
+		return ImageResponse{
+			ID:           img.ID.String(),
+			IsPrimary:    img.IsPrimary,
+			ImageUrl:     img.ImageURL,
+			DisplayOrder: img.DisplayOrder,
+		}
+	})
+
 	return &ProductResponse{
 		ID:          item.ID.String(),
 		Name:        item.Name,
 		Description: item.Description,
 		Stock:       item.Stock,
 		Price:       item.Price,
+		Images:      finalImages,
 		CategoryID:  item.CategoryID,
 		CreatedAt:   item.CreatedAt.String(),
 		UpdatedAt:   item.UpdatedAt.String(),
@@ -112,16 +124,16 @@ func (ps *ProductsService) UpdateProduct(id string, request CreateProductRequest
 	db := dbclient.GetCient()
 
 	var item database.Product
+	var images []database.ProductImages
 
 	data, err := utils.StructToMap(request)
 	if err != nil {
 		return nil, errors.InternalServerError("Failed to read payload")
 	}
 
-	log.Println("UpdateProduct: %+v", data)
 	result := db.Model(database.Product{}).Where("id = ?", id).Updates(data).First(&item)
-
-	if result.Error != nil {
+	result2 := db.Model(database.ProductImages{}).Where("product_id = ?", id).Find(&images)
+	if result.Error != nil || result2.Error != nil {
 
 		if result.Error == gorm.ErrRecordNotFound {
 			return nil, errors.NotFoundError("Product not found")
@@ -130,6 +142,15 @@ func (ps *ProductsService) UpdateProduct(id string, request CreateProductRequest
 		return nil, errors.InternalServerError("Failed to update product")
 	}
 
+	finalImages := utils.Map(images, func(img database.ProductImages) ImageResponse {
+		return ImageResponse{
+			ID:           img.ID.String(),
+			IsPrimary:    img.IsPrimary,
+			ImageUrl:     img.ImageURL,
+			DisplayOrder: img.DisplayOrder,
+		}
+	})
+
 	return &ProductResponse{
 		ID:          item.ID.String(),
 		Name:        item.Name,
@@ -137,6 +158,7 @@ func (ps *ProductsService) UpdateProduct(id string, request CreateProductRequest
 		Stock:       item.Stock,
 		Price:       item.Price,
 		CategoryID:  item.CategoryID,
+		Images:      finalImages,
 		CreatedAt:   item.CreatedAt.String(),
 		UpdatedAt:   item.UpdatedAt.String(),
 	}, nil
@@ -188,32 +210,6 @@ func (ps *ProductsService) PostImages(productId string, req PostImagesRequest) (
 	tx.Commit()
 
 	finalImages := utils.Map(newImages, func(img database.ProductImages) ImageResponse {
-		return ImageResponse{
-			ID:           img.ID.String(),
-			DisplayOrder: img.DisplayOrder,
-			IsPrimary:    img.IsPrimary,
-			ImageUrl:     img.ImageURL,
-		}
-	})
-
-	return &PostImagesResponse{
-		Images: finalImages,
-	}, nil
-
-}
-
-func (ps *ProductsService) GetImages(productId string) (*PostImagesResponse, *errors.ApiError) {
-	db := dbclient.GetCient()
-	var images []database.ProductImages
-
-	result := db.Where("product_id = ?", productId).Find(&images)
-
-	if result.Error != nil {
-
-		return nil, errors.InternalServerError("Failed to fetch images")
-	}
-
-	finalImages := utils.Map(images, func(img database.ProductImages) ImageResponse {
 		return ImageResponse{
 			ID:           img.ID.String(),
 			DisplayOrder: img.DisplayOrder,

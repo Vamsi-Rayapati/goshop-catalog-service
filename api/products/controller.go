@@ -159,22 +159,3 @@ func (pc *ProductsController) PostImages(c *gin.Context) {
 	c.JSON(http.StatusCreated, res)
 
 }
-
-func (pc *ProductsController) GetImages(c *gin.Context) {
-
-	productId := c.Param("id")
-	err := validator.ValidateUUID(productId)
-	if err != nil {
-		c.JSON(err.Code, err)
-		return
-	}
-
-	res, err := pc.service.GetImages(productId)
-
-	if err != nil {
-		c.JSON(err.Code, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, res)
-}
