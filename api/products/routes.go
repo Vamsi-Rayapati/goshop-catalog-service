@@ -11,5 +11,5 @@ func RegisterRoutes(group *gin.RouterGroup) {
 	group.GET("/products/:id", productsController.GetProduct)
 	group.PATCH("/products/:id", productsController.UpdateProduct)
 	group.DELETE("/products/:id", productsController.DeleteProduct)
-	group.POST("/products/:id/images", productsController.PostImages)
+	group.PUT("/products/:id/images", productsController.PostImages)
 }
