@@ -20,8 +20,9 @@ type PostImagesResponse struct {
 }
 
 type GetProductsRequest struct {
-	PageNo   int `form:"page_no" validate:"required,gte=1"`
-	PageSize int `form:"page_size" validate:"required,gte=1"`
+	PageNo     int  `form:"page_no" validate:"required,gte=1"`
+	PageSize   int  `form:"page_size" validate:"required,gte=1"`
+	CategoryID uint `form:"category_id"`
 }
 
 type ProductResponse struct {

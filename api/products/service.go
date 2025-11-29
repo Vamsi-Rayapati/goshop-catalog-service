@@ -55,7 +55,14 @@ func (ps *ProductsService) GetProducts(request GetProductsRequest) (*ProductsRes
 	var total int64
 
 	db.Model(&database.Product{}).Count(&total)
-	result := db.Preload("Category").Order("created_at").Offset(request.PageSize * (request.PageNo - 1)).Limit(request.PageSize).Find(&items)
+
+	query := db.Model(&database.Product{}).Preload("Category")
+
+	if request.CategoryID != 0 {
+		query = query.Where("category_id = ?", request.CategoryID)
+	}
+
+	result := query.Order("created_at").Offset(request.PageSize * (request.PageNo - 1)).Limit(request.PageSize).Find(&items)
 
 	if result.Error != nil {
 		return nil, errors.InternalServerError("Failed to get products")
