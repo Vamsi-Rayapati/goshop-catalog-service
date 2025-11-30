@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartbot/catalog/api"
 	"github.com/smartbot/catalog/database"
+	"github.com/smartbot/catalog/pkg/client"
 	"github.com/smartbot/catalog/pkg/config"
 	"github.com/smartbot/catalog/pkg/dbclient"
 )
@@ -22,6 +23,9 @@ func main() {
 	}
 
 	err = db.AutoMigrate(&database.Product{}, &database.Category{}, &database.ProductImages{})
+
+	redisClient := client.GetRedisClient()
+	redisClient.Connect()
 
 	if err != nil {
 		log.Fatalf("Migration failed: %v", err)

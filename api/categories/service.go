@@ -1,7 +1,13 @@
 package categories
 
 import (
+	"context"
+	"encoding/json"
+	"log"
+	"time"
+
 	"github.com/smartbot/catalog/database"
+	"github.com/smartbot/catalog/pkg/client"
 	"github.com/smartbot/catalog/pkg/dbclient"
 	"github.com/smartbot/catalog/pkg/errors"
 	"github.com/smartbot/catalog/pkg/utils"
@@ -11,11 +17,27 @@ import (
 type CategoriesService struct {
 }
 
+var ctx = context.Background()
+
 func (cs *CategoriesService) GetCategories(request CategoriesRequest) (*CategoriesResponse, *errors.ApiError) {
+
+	redisClient := client.GetRedisClient()
+	cached, err := redisClient.Get(ctx, "categories").Result()
+
+	if err == nil {
+		log.Println("Got Cache", cached)
+		var resp []CategoryResponse
+		if unmarshalErr := json.Unmarshal([]byte(cached), &resp); unmarshalErr == nil {
+			return &CategoriesResponse{
+				Categories: resp,
+				Total:      int64(len(resp)),
+			}, nil
+		}
+	}
+
 	db := dbclient.GetCient()
 	var categories []database.Category
 	var total int64
-
 	db.Model(&database.Category{}).Count(&total)
 	result := db.Order("created_at").Offset(request.PageSize * (request.PageNo - 1)).Limit(request.PageSize).Find(&categories)
 
@@ -29,6 +51,9 @@ func (cs *CategoriesService) GetCategories(request CategoriesRequest) (*Categori
 			Name: user.Name,
 		}
 	})
+
+	serialized, _ := json.Marshal(catList)
+	redisClient.SetEx(ctx, "categories", serialized, 10*time.Minute)
 
 	return &CategoriesResponse{
 		Categories: catList,
