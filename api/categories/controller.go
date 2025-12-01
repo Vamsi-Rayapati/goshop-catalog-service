@@ -34,6 +34,18 @@ func (cc CategoriesController) GetCategories(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+func (cc CategoriesController) GetAllCategories(c *gin.Context) {
+
+	res, err := cc.service.GetAllCategories()
+
+	if err != nil {
+		c.JSON(err.Code, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, res)
+}
+
 func (cc CategoriesController) CreateCategory(c *gin.Context) {
 	var req CreateCategoryRequest
 	err := validator.ValidateBody(c, &req)

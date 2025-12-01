@@ -8,4 +8,5 @@ func RegisterRoutes(group *gin.RouterGroup) {
 	group.GET("/categories", controller.GetCategories)
 	group.POST("/categories", controller.CreateCategory)
 	group.DELETE("/categories/:id", controller.DeleteCategory)
+	group.GET("/categories/all", controller.GetAllCategories)
 }

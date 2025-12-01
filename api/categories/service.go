@@ -21,6 +21,32 @@ var ctx = context.Background()
 
 func (cs *CategoriesService) GetCategories(request CategoriesRequest) (*CategoriesResponse, *errors.ApiError) {
 
+	db := dbclient.GetCient()
+	var categories []database.Category
+	var total int64
+	db.Model(&database.Category{}).Count(&total)
+	result := db.Order("created_at").Offset(request.PageSize * (request.PageNo - 1)).Limit(request.PageSize).Find(&categories)
+
+	if result.Error != nil {
+		return nil, errors.InternalServerError("Failed to get categories")
+	}
+
+	catList := utils.Map(categories, func(user database.Category) CategoryResponse {
+		return CategoryResponse{
+			ID:   user.ID,
+			Name: user.Name,
+		}
+	})
+
+	return &CategoriesResponse{
+		Categories: catList,
+		Total:      total,
+	}, nil
+
+}
+
+func (cs *CategoriesService) GetAllCategories() (*CategoriesResponse, *errors.ApiError) {
+
 	redisClient := client.GetRedisClient()
 	cached, err := redisClient.Get(ctx, "categories").Result()
 
@@ -39,7 +65,7 @@ func (cs *CategoriesService) GetCategories(request CategoriesRequest) (*Categori
 	var categories []database.Category
 	var total int64
 	db.Model(&database.Category{}).Count(&total)
-	result := db.Order("created_at").Offset(request.PageSize * (request.PageNo - 1)).Limit(request.PageSize).Find(&categories)
+	result := db.Order("created_at").Find(&categories)
 
 	if result.Error != nil {
 		return nil, errors.InternalServerError("Failed to get categories")
